@@ -108,16 +108,16 @@ def painel(sel) -> None:
         else:
             st.session_state["usos"] = st.session_state.get("usos", 0) + 1
             armazem.contar_chamada()
-            barra = st.progress(0.03, text="Enviando o trecho e o relatório explicativo ao modelo…")
+            barra = st.progress(0.03)   # sem texto, por decisão do autor: só a barra
 
             def ao_esperar(segundos: float | None) -> None:
                 if segundos is None:      # chegou o primeiro trecho da resposta
                     barra.empty()
                     return
                 # A API não informa quanto falta. A barra mede tempo decorrido numa curva que
-                # se aproxima do fim sem alcançá-lo, e o texto mostra os segundos de verdade.
+                # se aproxima do fim sem alcançá-lo.
                 avanco = 0.05 + 0.9 * (1 - math.exp(-segundos / 8))
-                barra.progress(min(avanco, 0.95), text=f"O modelo está analisando o trecho… {segundos:.0f} s")
+                barra.progress(min(avanco, 0.95))
 
             try:
                 fluxo = fluxo_simulado(pedido) if simulando() else fluxo_api(cliente, MODELO, pedido)

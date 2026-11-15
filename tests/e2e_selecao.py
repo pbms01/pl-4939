@@ -173,7 +173,7 @@ with sync_playwright() as p:
         # enquanto o modelo não responde, a barra de espera fica à vista; some quando o texto começa
         barra = painel(page).get_by_role("progressbar")
         expect(barra).to_be_visible(timeout=5000)
-        expect(painel(page)).to_contain_text("O modelo está analisando o trecho", timeout=5000)
+        assert "analisando" not in painel(page).inner_text(), "a barra de espera não deve trazer texto"
         expect(painel(page)).to_contain_text("[simulação] Explicação de teste apoiada em: §", timeout=15000)
         expect(painel(page)).to_contain_text("Explicação gerada por IA", timeout=15000)
         expect(barra).to_be_hidden(timeout=5000)

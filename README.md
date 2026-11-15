@@ -56,7 +56,7 @@ que têm no texto. Os botões ? ficam sempre à vista. Em tela larga a caixa do 
 ajustada para terminar no pé da janela.
 
 Enquanto o modelo raciocina, antes do primeiro trecho da resposta, o painel mostra uma barra
-com os segundos decorridos. A API não informa quanto falta: a barra mede tempo, numa curva
+de progresso, sem texto. A API não informa quanto falta: a barra mede tempo, numa curva
 que se aproxima do fim sem alcançá-lo, e some quando a resposta começa a chegar.
 
 ## Tela estreita
