@@ -8,12 +8,14 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import queue
 import sqlite3
 import threading
+import time
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
-from typing import Iterator
+from typing import Callable, Iterator
 
 from leitor import Corpus, Selecao, texto_plano
 
@@ -228,8 +230,56 @@ def fluxo_api(cliente, modelo: str, pedido: Pedido) -> Iterator[str]:
         yield from fluxo.text_stream
 
 
+def com_espera(fluxo: Iterator[str], ao_esperar: Callable[[float | None], None],
+               intervalo: float = 0.25) -> Iterator[str]:
+    """Repassa o fluxo e, enquanto o primeiro trecho não chega, chama ao_esperar(segundos).
+
+    O modelo raciocina antes de escrever, e nesse intervalo a API não devolve nada. Quem
+    consome o fluxo ficaria bloqueado na espera, sem poder atualizar a tela. Aqui o fluxo
+    é lido em outra thread, e esta fica livre para avisar a interface a cada intervalo.
+    Chegado o primeiro trecho, ao_esperar(None) encerra o aviso. A thread auxiliar só lê
+    o fluxo; toda a interação com a interface continua na thread de quem chamou.
+    """
+    fila: queue.Queue = queue.Queue()
+    fim = object()
+    cancelado = threading.Event()
+
+    def ler() -> None:
+        try:
+            for trecho in fluxo:
+                if cancelado.is_set():
+                    break
+                fila.put(trecho)
+            fila.put(fim)
+        except BaseException as erro:  # o erro da chamada é devolvido a quem consome o fluxo
+            fila.put(erro)
+
+    threading.Thread(target=ler, daemon=True).start()
+    inicio = time.monotonic()
+    esperando = True
+    try:
+        while True:
+            try:
+                item = fila.get(timeout=intervalo)
+            except queue.Empty:
+                if esperando:
+                    ao_esperar(time.monotonic() - inicio)
+                continue
+            if esperando:
+                esperando = False
+                ao_esperar(None)
+            if item is fim:
+                return
+            if isinstance(item, BaseException):
+                raise item
+            yield item
+    finally:
+        cancelado.set()   # se o leitor sair da página no meio, a thread auxiliar para na próxima volta
+
+
 def fluxo_simulado(pedido: Pedido) -> Iterator[str]:
     """Resposta fixa, sem chamada externa. Serve só aos testes do encadeamento (PL4939_SIMULAR=1)."""
+    time.sleep(2.0)   # imita o tempo de raciocínio do modelo, para que a barra de espera apareça
     nums = ", ".join(f"§ {n}" for n in pedido.numeros[:3]) or "sem parágrafos"
     for palavra in f"[simulação] Explicação de teste apoiada em: {nums}.".split(" "):
         yield palavra + " "

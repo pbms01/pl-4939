@@ -7,7 +7,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 from explicador import (INTENCOES, LIMITE_MATERIAL, MODELO_PADRAO, Armazem, Relatorio,  # noqa: E402
-                        chaves_da_selecao, fluxo_api, preparar)
+                        chaves_da_selecao, com_espera, fluxo_api, preparar)
 from leitor import Corpus, validar  # noqa: E402
 
 c = Corpus.carregar(RAIZ / "corpus.json")
@@ -100,5 +100,39 @@ kw = cli.messages.kw
 assert kw["model"] == "claude-sonnet-5-5" and "temperature" not in kw and "top_p" not in kw
 assert kw["system"] == [{"type": "text", "text": a.sistema, "cache_control": {"type": "ephemeral"}}]
 assert kw["messages"] == [{"role": "user", "content": a.usuario}]
+
+# espera pelo primeiro trecho: avisos periódicos com o tempo decorrido, depois o aviso de fim, e só então o texto
+import time  # noqa: E402
+
+
+def lento():
+    time.sleep(0.5)
+    yield "um"
+    time.sleep(0.2)   # pausa no meio da resposta não reabre o aviso de espera
+    yield " dois"
+
+
+avisos = []
+assert "".join(com_espera(lento(), avisos.append, intervalo=0.1)) == "um dois"
+assert len(avisos) >= 4 and avisos[-1] is None and avisos.count(None) == 1, avisos
+assert all(isinstance(x, float) for x in avisos[:-1]) and avisos[:-1] == sorted(avisos[:-1]), avisos
+
+
+def quebra():
+    time.sleep(0.15)
+    raise RuntimeError("falha da API")
+    yield  # pragma: no cover
+
+
+avisos = []
+try:
+    list(com_espera(quebra(), avisos.append, intervalo=0.05))
+    raise AssertionError("o erro do fluxo deveria chegar a quem o consome")
+except RuntimeError as erro:
+    assert str(erro) == "falha da API" and avisos and avisos[-1] is None
+
+# resposta imediata: nenhum aviso de espera além do de fim
+avisos = []
+assert list(com_espera(iter(["a", "b"]), avisos.append, intervalo=0.2)) == ["a", "b"] and avisos == [None]
 
 print("explicador: todos os testes passaram")

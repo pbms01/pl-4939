@@ -139,14 +139,54 @@ def montar_html(corpus: Corpus) -> str:
     corpo = "\n".join(_html_unidade(u) for u in corpus.unidades)
     return (
         '<div class="pl-wrap">'
+        + COMO_USAR +
         f'<div class="pl-leitor" lang="pt-BR" tabindex="0" role="document" aria-label="Texto do projeto de lei">{corpo}</div>'
         '<button type="button" class="pl-sel-btn" hidden>Explicar seleção</button>'
         "</div>"
     )
 
 
+# Quadro de uso. Fica dentro do componente, e não em st.info, por duas razões: reproduz
+# os dois controles com a mesma aparência que eles têm no texto, de modo que o leitor
+# reconhece o que procurar, e fica colado ao texto em qualquer largura de tela.
+# Está fora de .pl-leitor: selecionar o quadro não gera pedido de explicação.
+COMO_USAR = (
+    '<div class="pl-uso" role="note" aria-label="Como pedir a explicação de um trecho">'
+    '<p class="pl-uso-tit">Como pedir a explicação de um trecho</p>'
+    '<ol>'
+    '<li><strong>Selecione</strong> qualquer trecho do texto, com o mouse ou com o dedo. '
+    'Aparece o botão <span class="pl-uso-sel">Explicar seleção</span>. Acione-o.</li>'
+    '<li>Ou acione o <span class="pl-uso-q">?</span> à direita de um artigo, parágrafo, inciso ou alínea, '
+    'para explicar o dispositivo inteiro.</li>'
+    '</ol>'
+    '<p class="pl-uso-onde"><span class="pl-so-larga">A explicação aparece ao lado do texto.</span>'
+    '<span class="pl-so-estreita">A explicação abre sobre o texto.</span></p>'
+    '</div>'
+)
+
 CSS = """
 .pl-wrap { position: relative; }
+[data-testid="stMainBlockContainer"] { padding-top: 3.5rem; padding-bottom: 1.5rem; }
+.pl-uso {
+  margin: 0 0 .9rem 0; padding: .85rem 1.1rem .8rem 1.1rem; border-radius: 8px;
+  border: 2px solid var(--st-primary-color, #c0392b);
+  background: color-mix(in srgb, var(--st-primary-color, #c0392b) 9%, transparent);
+  font: 400 .98rem/1.5 system-ui, sans-serif; color: var(--st-text-color, inherit);
+}
+.pl-uso-tit { margin: 0 0 .35rem 0; font-weight: 700; font-size: 1.05rem; }
+.pl-uso ol { margin: 0; padding-left: 1.3rem; }
+.pl-uso li { margin: .2rem 0; }
+.pl-uso-onde { margin: .4rem 0 0 0; font-weight: 600; }
+.pl-uso-sel {
+  display: inline-block; padding: .05rem .5rem; border-radius: 6px; white-space: nowrap;
+  font-weight: 600; font-size: .86rem; color: #fff; background: var(--st-primary-color, #c0392b);
+}
+.pl-uso-q {
+  display: inline-block; width: 1.45rem; height: 1.45rem; line-height: 1.3rem; text-align: center;
+  border: 1px solid currentColor; border-radius: 50%; font-weight: 700; font-size: .85rem;
+  color: var(--st-primary-color, #c0392b);
+}
+.pl-so-estreita { display: none; }
 .pl-leitor {
   position: relative; max-height: 78vh; overflow-y: auto; padding: 1.25rem 2.75rem 2rem 1.5rem;
   border: 1px solid var(--st-border-color, rgba(128,128,128,.3)); border-radius: 8px;
@@ -172,11 +212,11 @@ CSS = """
 .pl-u-btn {
   position: absolute; right: -2.1rem; top: .15rem; width: 1.6rem; height: 1.6rem; padding: 0;
   border: 1px solid transparent; border-radius: 50%; background: transparent; cursor: pointer;
-  color: var(--st-primary-color, #c0392b); opacity: 0; user-select: none; -webkit-user-select: none;
+  color: var(--st-primary-color, #c0392b); opacity: .5; border-color: currentColor;
+  user-select: none; -webkit-user-select: none;
 }
 .pl-u-btn::before { content: "?"; font: 700 .85rem/1 system-ui, sans-serif; }
-.pl-u:hover > .pl-u-btn, .pl-u-btn:focus-visible { opacity: 1; border-color: currentColor; }
-@media (hover: none) { .pl-u-btn { opacity: .55; border-color: currentColor; } }
+.pl-u:hover > .pl-u-btn, .pl-u-btn:focus-visible { opacity: 1; }
 .pl-sel-btn {
   position: absolute; z-index: 5; padding: .35rem .8rem; border: 0; border-radius: 6px; cursor: pointer;
   font: 600 .9rem/1.2 system-ui, sans-serif; color: #fff; background: var(--st-primary-color, #c0392b);
@@ -198,7 +238,9 @@ CSS = """
   .pl-citado.pl-n1 { margin-left: 1.2rem; }
   .pl-citado.pl-n2 { margin-left: 2.1rem; }
   .pl-u-btn { right: -2rem; }
-  [data-testid="stMainBlockContainer"] { padding-top: 3.5rem; padding-bottom: 2rem; }
+  .pl-uso { padding: .7rem .85rem; font-size: .93rem; }
+  .pl-so-larga { display: none; }
+  .pl-so-estreita { display: inline; }
   [data-testid="stHeading"] h1 { font-size: 1.45rem; padding: .25rem 0; }
 }
 """
@@ -210,6 +252,24 @@ export default function (component) {
   if (!wrap) return;
   const leitor = wrap.querySelector('.pl-leitor');
   const btn = wrap.querySelector('.pl-sel-btn');
+
+  // O Python decide onde mostrar a explicação: ao lado do texto ou, em tela estreita, sobre ele.
+  // 640 px é a largura em que o Streamlit empilha as colunas e o painel desce para baixo do leitor.
+  const estreita = () => window.matchMedia('(max-width: 640px)').matches;
+
+  // Em tela larga a caixa do texto termina no pé da janela, qualquer que seja a altura do que
+  // está acima dela (título, índice, quadro de uso). Altura fixa em CSS deixaria o fim da caixa
+  // fora da tela e criaria duas rolagens, a da página e a do texto.
+  const principal = leitor.closest('[data-testid="stMain"]');
+  const ajustar = () => {
+    if (estreita()) { leitor.style.maxHeight = ''; return; }
+    const topo = leitor.getBoundingClientRect().top + (principal ? principal.scrollTop : 0);
+    leitor.style.maxHeight = Math.max(320, window.innerHeight - topo - 20) + 'px';
+  };
+  ajustar();
+  window.addEventListener('resize', ajustar);
+  // o que está acima ainda muda de altura depois da montagem (fontes, widgets do Streamlit)
+  const reajustes = [300, 1000, 2500].map((ms) => setTimeout(ajustar, ms));
 
   // Navegação pedida pelo Python ("Ir para"). O número do pedido fica gravado no próprio
   // elemento: esta função roda de novo a cada reexecução do script, e sem a marca o leitor
@@ -259,9 +319,6 @@ export default function (component) {
   document.addEventListener('selectionchange', agendar);
   leitor.addEventListener('scroll', agendar, { passive: true });
 
-  // O Python decide onde mostrar a explicação: ao lado do texto ou, em tela estreita, sobre ele.
-  // 640 px é a largura em que o Streamlit empilha as colunas e o painel desce para baixo do leitor.
-  const estreita = () => window.matchMedia('(max-width: 640px)').matches;
   let ultimoEnvio = 0;
   const enviar = () => {
     const agora = Date.now();
@@ -288,6 +345,8 @@ export default function (component) {
 
   return () => {
     clearTimeout(timer);
+    reajustes.forEach(clearTimeout);
+    window.removeEventListener('resize', ajustar);
     document.removeEventListener('selectionchange', agendar);
     leitor.removeEventListener('scroll', agendar);
     leitor.removeEventListener('click', porDispositivo);

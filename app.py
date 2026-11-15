@@ -9,13 +9,14 @@ Configuração, por variável de ambiente ou em .streamlit/secrets.toml:
     PL4939_COTA_DIA      explicações novas por dia, somadas todas as sessões (padrão: 400)
 """
 import logging
+import math
 import os
 from pathlib import Path
 
 import streamlit as st
 
-from explicador import (INTENCOES, MODELO_PADRAO, Armazem, Relatorio, criar_cliente, fluxo_api,
-                        fluxo_simulado, preparar, simulando)
+from explicador import (INTENCOES, MODELO_PADRAO, Armazem, Relatorio, com_espera, criar_cliente,
+                        fluxo_api, fluxo_simulado, preparar, simulando)
 from leitor import Corpus, indice, registrar, validar
 
 RAIZ = Path(__file__).parent
@@ -74,7 +75,6 @@ with col_texto:
         "Ir para", options=list(entradas), format_func=entradas.get, index=None,
         placeholder="Capítulo, seção ou artigo", key="nav_destino", on_change=_navegar,
     )
-    st.caption("Selecione um trecho, ou toque em ? ao lado de um dispositivo, para ver a explicação.")
     leitor = registrar(corpus)
     # O valor de gatilho só existe na execução disparada pelo clique. Por isso a seleção
     # validada vai, mais abaixo, para o session_state: a escolha da intenção reexecuta
@@ -108,14 +108,26 @@ def painel(sel) -> None:
         else:
             st.session_state["usos"] = st.session_state.get("usos", 0) + 1
             armazem.contar_chamada()
+            barra = st.progress(0.03, text="Enviando o trecho e o relatório explicativo ao modelo…")
+
+            def ao_esperar(segundos: float | None) -> None:
+                if segundos is None:      # chegou o primeiro trecho da resposta
+                    barra.empty()
+                    return
+                # A API não informa quanto falta. A barra mede tempo decorrido numa curva que
+                # se aproxima do fim sem alcançá-lo, e o texto mostra os segundos de verdade.
+                avanco = 0.05 + 0.9 * (1 - math.exp(-segundos / 8))
+                barra.progress(min(avanco, 0.95), text=f"O modelo está analisando o trecho… {segundos:.0f} s")
+
             try:
                 fluxo = fluxo_simulado(pedido) if simulando() else fluxo_api(cliente, MODELO, pedido)
-                resposta = st.write_stream(fluxo)
+                resposta = st.write_stream(com_espera(fluxo, ao_esperar))
                 if isinstance(resposta, str) and resposta.strip():
                     armazem.guardar(pedido.chave, resposta)
             except Exception:
                 # o detalhe do erro vai para o log do servidor, não para a tela do visitante
                 logging.exception("falha na chamada ao explicador")
+                barra.empty()
                 resposta = None
                 st.error("Não foi possível obter a explicação agora. Tente de novo em instantes.")
     if resposta:
@@ -160,8 +172,9 @@ with col_painel:
         st.caption("Nesta largura de tela a explicação abre sobre o texto, a cada pedido.")
     elif sel is None:
         st.info(
-            "Selecione um trecho do texto e use o botão **Explicar seleção**, "
-            "ou use o botão **?** ao lado de um dispositivo para explicá-lo por inteiro."
+            "**A explicação aparece aqui.** Selecione um trecho do texto e acione **Explicar seleção**, "
+            "ou acione o **?** à direita de um dispositivo.",
+            icon=":material/arrow_back:",
         )
     else:
         painel(sel)

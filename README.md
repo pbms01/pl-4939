@@ -48,6 +48,17 @@ guardadas da versão anterior deixam de ser usadas.
 - A recuperação é determinística, pelo artigo do dispositivo. Não há busca vetorial.
 - O painel sempre mostra os parágrafos do relatório enviados, para conferência do leitor.
 
+## Instrução de uso e espera
+
+O quadro "Como pedir a explicação de um trecho" fica acima do texto, dentro do próprio
+componente, e reproduz os dois controles (o botão Explicar seleção e o ?) com a aparência
+que têm no texto. Os botões ? ficam sempre à vista. Em tela larga a caixa do texto é
+ajustada para terminar no pé da janela.
+
+Enquanto o modelo raciocina, antes do primeiro trecho da resposta, o painel mostra uma barra
+com os segundos decorridos. A API não informa quanto falta: a barra mede tempo, numa curva
+que se aproxima do fim sem alcançá-lo, e some quando a resposta começa a chegar.
+
 ## Tela estreita
 
 Abaixo de 640 px de largura o texto corre na própria página, sem caixa de rolagem interna,

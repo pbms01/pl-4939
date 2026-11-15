@@ -54,9 +54,30 @@ with sync_playwright() as p:
     # 1. o leitor está no DOM da página, e não em shadow root
     assert page.evaluate("!!document.querySelector('.pl-leitor')")
     assert page.evaluate("document.querySelector('.pl-leitor').getRootNode() === document")
-    print("1. leitor montado fora de shadow root")
+    # o quadro de uso está à vista, diz onde a explicação aparece e não gera pedido se for selecionado
+    uso = page.locator(".pl-uso")
+    expect(uso).to_be_visible()
+    expect(uso).to_contain_text("A explicação aparece ao lado do texto.")
+    assert float(page.locator("[data-id='art-1'] .pl-u-btn").evaluate("el => getComputedStyle(el).opacity")) >= 0.4
+    page.evaluate(
+        """() => { const r = document.createRange(); r.selectNodeContents(document.querySelector('.pl-uso'));
+                   const s = document.getSelection(); s.removeAllRanges(); s.addRange(r); }"""
+    )
+    page.wait_for_timeout(400)
+    expect(page.locator(".pl-sel-btn")).to_be_hidden()
+    page.evaluate("document.getSelection().removeAllRanges()")
+    # a caixa do texto termina dentro da janela: não há segunda rolagem, a da página
+    page.wait_for_timeout(1200)
+    cx = page.locator(".pl-leitor").bounding_box()
+    assert cx["y"] + cx["height"] <= page.viewport_size["height"], f"a caixa do texto passa do pé da janela: {cx}"
+    assert cx["height"] >= 320
+    print(f"1. leitor montado fora de shadow root, quadro de uso e botões ? à vista, caixa do texto com {cx['height']:.0f} px")
 
     # 2. seleção por arrasto do mouse, atravessando dispositivos
+    # os dois dispositivos precisam estar na parte visível da caixa do texto antes do arrasto
+    page.evaluate("""() => { const l = document.querySelector('.pl-leitor');
+        l.scrollTop = document.querySelector("[data-id='art-1-par-unico']").offsetTop - 12; }""")
+    page.wait_for_timeout(300)
     a = page.locator("[data-id='art-1-par-unico']").bounding_box()
     b = page.locator("[data-id='art-2-inc-1']").bounding_box()
     page.mouse.move(a["x"] + 150, a["y"] + 12)
@@ -149,8 +170,13 @@ with sync_playwright() as p:
         # 8. botão Explicar, resposta em fluxo, aviso e cache de respostas
         painel(page).locator("label").filter(has_text="Racional do dispositivo").click()
         painel(page).get_by_role("button", name="Explicar").click()
+        # enquanto o modelo não responde, a barra de espera fica à vista; some quando o texto começa
+        barra = painel(page).get_by_role("progressbar")
+        expect(barra).to_be_visible(timeout=5000)
+        expect(painel(page)).to_contain_text("O modelo está analisando o trecho", timeout=5000)
         expect(painel(page)).to_contain_text("[simulação] Explicação de teste apoiada em: §", timeout=15000)
         expect(painel(page)).to_contain_text("Explicação gerada por IA", timeout=15000)
+        expect(barra).to_be_hidden(timeout=5000)
         # mesma seleção e mesma intenção de novo: a resposta vem do cache e o botão não reaparece
         alvo.hover()
         alvo.locator(".pl-u-btn").click()
