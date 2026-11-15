@@ -16,6 +16,8 @@ from pathlib import Path
 
 import streamlit as st
 
+# Unidades sem botão próprio: não há comentário do relatório a mostrar para elas.
+SEM_BOTAO = {"omissao", "preambulo", "capitulo", "secao", "titulo"}
 LIMITE_MIN = 2      # caracteres; abaixo disso a seleção é ruído (um clique duplo num artigo "a")
 LIMITE_MAX = 4000   # caracteres; teto de custo por pedido ao explicador
 
@@ -124,7 +126,7 @@ def _html_unidade(u: dict) -> str:
     rot = f'<span class="pl-rot">{html.escape(u["rotulo"])}</span> ' if u["rotulo"] else ""
     # O botão não tem texto: o ícone vem do CSS. Assim ele nunca entra em selection.toString()
     # e o trecho selecionado continua idêntico ao texto canônico.
-    botao = "" if u["tipo"] == "omissao" else (
+    botao = "" if u["tipo"] in SEM_BOTAO else (
         f'<button type="button" class="pl-u-btn" aria-label="Explicar {html.escape(u["ref"], quote=True)}"></button>'
     )
     return (
@@ -181,6 +183,24 @@ CSS = """
   box-shadow: 0 2px 8px rgba(0,0,0,.25); user-select: none; -webkit-user-select: none;
 }
 .pl-sel-btn[hidden] { display: none; }
+/* Tela estreita. Como o componente não usa shadow root, estas regras alcançam também a página:
+   o cabeçalho do Streamlit ocupa metade de uma tela de celular e é encolhido aqui. */
+@media (max-width: 640px) {
+  /* No celular o texto corre na própria página, sem caixa de rolagem interna: rolar uma
+     janela de meia tela dentro de outra rolagem é o que mais atrapalha a leitura por toque. */
+  .pl-leitor { max-height: none; overflow: visible; border: 0; padding: .25rem 2.3rem 1rem 0; font-size: 1rem; line-height: 1.6; }
+  .pl-u { scroll-margin-top: 4.5rem; }   /* o "Ir para" não pode parar o artigo atrás do cabeçalho fixo */
+  /* texto justificado em coluna estreita abre buracos entre as palavras */
+  .pl-artigo, .pl-paragrafo, .pl-inciso, .pl-alinea, .pl-pena, .pl-rubrica { text-align: left; hyphens: manual; }
+  .pl-n1 { margin-left: .9rem; }
+  .pl-n2 { margin-left: 1.8rem; }
+  .pl-citado { margin-left: .3rem; padding-left: .7rem; }
+  .pl-citado.pl-n1 { margin-left: 1.2rem; }
+  .pl-citado.pl-n2 { margin-left: 2.1rem; }
+  .pl-u-btn { right: -2rem; }
+  [data-testid="stMainBlockContainer"] { padding-top: 3.5rem; padding-bottom: 2rem; }
+  [data-testid="stHeading"] h1 { font-size: 1.45rem; padding: .25rem 0; }
+}
 """
 
 JS = """
@@ -197,7 +217,9 @@ export default function (component) {
   if (data && data.ir_para && String(data.pedido) !== wrap.dataset.pedido) {
     wrap.dataset.pedido = String(data.pedido);
     const alvo = leitor.querySelector(`[data-id="${CSS.escape(data.ir_para)}"]`);
-    if (alvo) leitor.scrollTop = alvo.offsetTop - 12;
+    // com caixa de rolagem própria (tela larga) rola-se o leitor; sem ela (celular), a página
+    if (alvo && leitor.scrollHeight > leitor.clientHeight + 1) leitor.scrollTop = alvo.offsetTop - 12;
+    else if (alvo) alvo.scrollIntoView({ block: 'start' });
   }
   let pendente = null, timer = null;
 
@@ -237,10 +259,20 @@ export default function (component) {
   document.addEventListener('selectionchange', agendar);
   leitor.addEventListener('scroll', agendar, { passive: true });
 
-  const segurar = (e) => e.preventDefault();   // mantém a seleção viva enquanto o botão é pressionado
+  // O Python decide onde mostrar a explicação: ao lado do texto ou, em tela estreita, sobre ele.
+  // 640 px é a largura em que o Streamlit empilha as colunas e o painel desce para baixo do leitor.
+  const estreita = () => window.matchMedia('(max-width: 640px)').matches;
+  let ultimoEnvio = 0;
   const enviar = () => {
-    if (pendente) setTriggerValue('selecao', { ...pendente, seq: Date.now() });
+    const agora = Date.now();
+    if (!pendente || agora - ultimoEnvio < 600) return;
+    ultimoEnvio = agora;
+    setTriggerValue('selecao', { ...pendente, estreita: estreita(), seq: agora });
   };
+  // O pedido sai já no pointerdown. No celular, o toque fora da seleção a desfaz, o botão
+  // se esconde e o clique que viria em seguida nunca chega. O clique fica para o teclado,
+  // e o intervalo de 600 ms impede o envio em dobro quando os dois eventos ocorrem.
+  const segurar = (e) => { e.preventDefault(); enviar(); };
   btn.addEventListener('pointerdown', segurar);
   btn.addEventListener('click', enviar);
 
@@ -250,7 +282,7 @@ export default function (component) {
     const u = b.closest('[data-id]');
     // seq muda a cada pedido para que dois toques seguidos no mesmo dispositivo gerem dois eventos,
     // e vem do relógio porque um contador voltaria a zero se o componente fosse remontado.
-    setTriggerValue('selecao', { modo: 'dispositivo', inicio: u.dataset.id, fim: u.dataset.id, texto: '', seq: Date.now() });
+    setTriggerValue('selecao', { modo: 'dispositivo', inicio: u.dataset.id, fim: u.dataset.id, texto: '', estreita: estreita(), seq: Date.now() });
   };
   leitor.addEventListener('click', porDispositivo);
 

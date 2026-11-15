@@ -48,6 +48,13 @@ guardadas da versão anterior deixam de ser usadas.
 - A recuperação é determinística, pelo artigo do dispositivo. Não há busca vetorial.
 - O painel sempre mostra os parágrafos do relatório enviados, para conferência do leitor.
 
+## Tela estreita
+
+Abaixo de 640 px de largura o texto corre na própria página, sem caixa de rolagem interna,
+alinhado à esquerda, e a explicação abre em diálogo sobre o texto. Nessa largura o Streamlit
+empilha as colunas, e a coluna da explicação ficaria abaixo do texto inteiro, fora da vista.
+O componente informa a largura a cada pedido, e o Python escolhe entre a coluna e o diálogo.
+
 ## Controles
 
 - O servidor só aceita trecho que seja subcadeia do texto canônico.
@@ -65,6 +72,7 @@ guardadas da versão anterior deixam de ser usadas.
     pip install -r requirements-dev.txt && python -m playwright install firefox webkit
     streamlit run app.py --server.headless true --server.port 8765 &
     python tests/e2e_selecao.py http://localhost:8765 "" chrome        # ou firefox, webkit
+    python tests/e2e_celular.py http://localhost:8765 iphone           # ou pixel
     # com resposta simulada, para percorrer o botão Explicar e o cache:
     PL4939_SIMULAR=1 streamlit run app.py --server.headless true --server.port 8765 &
     python tests/e2e_selecao.py http://localhost:8765 "" chrome sim
@@ -78,5 +86,5 @@ guardadas da versão anterior deixam de ser usadas.
 - A justificação ainda não é exibida.
 - A intenção "o que muda em relação ao texto de 2020" depende de indexar por dispositivo o
   guia do relator e o texto original.
-- Teste manual em Safari (macOS e iOS) e em Android, com seleção por toque.
-- Em tela estreita o Streamlit empilha as colunas e o painel vai para baixo do texto.
+- Teste em aparelho de verdade (Safari no iOS e Chrome no Android) do gesto de seleção por
+  pressão longa. A emulação cobre a largura da tela e o toque, não esse gesto.
