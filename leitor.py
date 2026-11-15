@@ -193,7 +193,7 @@ CSS = """
   font-family: Georgia, "Times New Roman", serif; font-size: 1.02rem; line-height: 1.65;
   color: var(--st-text-color, inherit); background: var(--st-background-color, transparent);
 }
-.pl-u { position: relative; margin: 0 0 .7rem 0; text-align: justify; hyphens: auto; }
+.pl-u { position: relative; margin: 0 0 .7rem 0; text-align: justify; -webkit-hyphens: auto; hyphens: auto; }
 .pl-rot { font-weight: 700; }
 .pl-inciso .pl-rot, .pl-alinea .pl-rot, .pl-pena .pl-rot { font-weight: 400; }
 .pl-n1 { margin-left: 1.5rem; }
