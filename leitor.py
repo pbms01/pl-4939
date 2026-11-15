@@ -230,8 +230,8 @@ CSS = """
      janela de meia tela dentro de outra rolagem é o que mais atrapalha a leitura por toque. */
   .pl-leitor { max-height: none; overflow: visible; border: 0; padding: .25rem 2.3rem 1rem 0; font-size: 1rem; line-height: 1.6; }
   .pl-u { scroll-margin-top: 4.5rem; }   /* o "Ir para" não pode parar o artigo atrás do cabeçalho fixo */
-  /* texto justificado em coluna estreita abre buracos entre as palavras */
-  .pl-artigo, .pl-paragrafo, .pl-inciso, .pl-alinea, .pl-pena, .pl-rubrica { text-align: left; hyphens: manual; }
+  /* O texto segue justificado também aqui, por decisão do autor. A hifenização automática
+     (lang="pt-BR" no leitor) é o que contém os buracos entre palavras na coluna estreita. */
   .pl-n1 { margin-left: .9rem; }
   .pl-n2 { margin-left: 1.8rem; }
   .pl-citado { margin-left: .3rem; padding-left: .7rem; }

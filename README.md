@@ -62,7 +62,7 @@ que se aproxima do fim sem alcançá-lo, e some quando a resposta começa a cheg
 ## Tela estreita
 
 Abaixo de 640 px de largura o texto corre na própria página, sem caixa de rolagem interna,
-alinhado à esquerda, e a explicação abre em diálogo sobre o texto. Nessa largura o Streamlit
+justificado e com hifenização automática, e a explicação abre em diálogo sobre o texto. Nessa largura o Streamlit
 empilha as colunas, e a coluna da explicação ficaria abaixo do texto inteiro, fora da vista.
 O componente informa a largura a cada pedido, e o Python escolhe entre a coluna e o diálogo.
 

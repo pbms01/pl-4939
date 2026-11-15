@@ -41,11 +41,11 @@ with sync_playwright() as p:
     assert cu["y"] + cu["height"] <= alt, f"o quadro de uso não cabe na primeira tela: {cu}"
     cx = page.locator(".pl-leitor").bounding_box()
     assert cx["y"] < alt, f"o texto começa fora da primeira tela: {cx['y']:.0f} de {alt}"
-    assert page.evaluate("getComputedStyle(document.querySelector(\"[data-id='art-1']\")).textAlign") in ("left", "start")
+    assert page.evaluate("getComputedStyle(document.querySelector(\"[data-id='art-1']\")).textAlign") == "justify"
     assert page.locator("[data-id='cap-1'] .pl-u-btn").count() == 0, "título de capítulo não deve ter botão"
     if PASTA:
         page.screenshot(path=f"{PASTA}/cel_{APARELHO}_1_leitor.png")
-    print(f"1. quadro de uso inteiro na primeira tela (termina em {cu['y'] + cu['height']:.0f} de {alt} px), texto alinhado à esquerda")
+    print(f"1. quadro de uso inteiro na primeira tela (termina em {cu['y'] + cu['height']:.0f} de {alt} px), texto justificado")
 
     # 2. toque no botão do dispositivo abre a explicação sobre o texto, visível sem rolar
     page.locator("[data-id='art-5-par-1']").scroll_into_view_if_needed()
